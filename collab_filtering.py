@@ -53,6 +53,7 @@ class NeuralCollabFiltering:
     max_rating = 0
     today = datetime.today().date()
     x_train, y_train, x_val, y_val = [], [], [], []
+    df, model, user_encodings, item_encodings, item_encoded2item = None, None, None, None, None
 
     def __init__(self, cols=None):
         """
@@ -104,7 +105,7 @@ class NeuralCollabFiltering:
             f"Max {self.col_map['rating']}: {self.max_rating}"
             )
         if not encoding_path:
-            encoding_path = os.path.join(self.base_dir, f"encoders_{self.today.strftime('%Y%m%d')}.json")
+            encoding_path = os.path.join(self.base_dir, f"model/encoders_{self.today.strftime('%Y%m%d')}.json")
         encodings = {'user_encodings': user_encodings, 'item_encodings': item_encodings}
         with open(encoding_path, 'w+', encoding='utf-8', newline='') as f:
             json.dump(encodings, f, indent=4, sort_keys=True)
@@ -168,13 +169,75 @@ class NeuralCollabFiltering:
             plt.legend(["train", "test"], loc="upper left")
             plt.show()
         if save_model:
-            model_path = os.path.join(self.base_dir, f"ncf_model_{self.today.strftime('%Y%m%d')}")
+            model_path = os.path.join(self.base_dir, f"model/ncf_model_{self.today.strftime('%Y%m%d')}")
             model.save(model_path, save_format='tf')
         print(f'Training time: {(time.time() - t0)/3600} hours.')
         
         return model
+    
+    def load_model(self, csv_path, model_path, encodings_path):
+        """Loads pre-trained model to memory.
+        
+        :param csv_path: Path containing the raw data as reference
+        :param model_path: path of the model
+        :param encodings_path: path ot user and item encodings."""
+        self.df = pd.read_csv(csv_path)
+        assert encodings_path.endswith('.json')
+        with open(encodings_path, 'r', encoding='utf-8') as f:
+            encoded = json.load(f)
+            self.user_encodings = encoded['user_encodings']
+            self.item_encodings = encoded['item_encodings']
+        self.item_encoded2item = {v: k for k, v in self.item_encodings.items()}
+        self.model = tf.keras.models.load_model(model_path, custom_objects=None, compile=True, options=None)
+        
+    def recommend(self, user_id=None, verbose=True):
+        if not user_id:
+            user_id = self.df[self.df.duplicated(subset=[self.col_map['userId']])][self.col_map['userId']].sample(1).iloc[0]
+            
+        items_watched_by_user = self.df[self.df[self.col_map['userId']] == user_id]
+        if items_watched_by_user.empty:
+            return []
+        items_not_watched = self.df[~self.df[self.col_map['itemId']].isin(
+            items_watched_by_user[self.col_map['itemId']].values)][self.col_map['itemId']]
+        items_not_watched = list(
+            set(items_not_watched).intersection(set(self.item_encodings.keys()))
+        )
+        items_not_watched = [[self.item_encodings.get(x)] for x in items_not_watched]
+        user_encoder = self.user_encodings.get(user_id)
+        user_item_array = np.hstack(
+            ([[user_encoder]] * len(items_not_watched), items_not_watched)
+        )
+        ratings = self.model.predict(user_item_array).flatten()
+        top_ratings_indices = ratings.argsort()[-10:][::-1]
+        recommended_item_ids = [
+            self.item_encoded2item.get(items_not_watched[x][0]) for x in top_ratings_indices
+        ]
+        recommended_items = self.df[
+                self.df[self.col_map["itemId"]].isin(recommended_item_ids)].drop_duplicates(subset=[self.col_map['itemId']])
+        if verbose:
+            print("Showing recommendations for user: {}".format(user_id))
+            print("====" * 9)
+            print("Articles with high time on page from user")
+            print("----" * 8)
+            top_items_user = (
+                items_watched_by_user.sort_values(by=self.col_map['itemId'], ascending=False).drop_duplicates()
+                    .head(5)
+                    .slug.values
+            )
+            item_df_rows = self.df[self.df[self.col_map['itemId']].isin(top_items_user)].drop_duplicates(subset=[self.col_map['itemId']])
+            for item in item_df_rows[self.col_map['itemId']]:
+                print(item)
 
-    def recommend(self, csv_path, model, encodings, user_id=None, verbose=True):
+            print("----" * 8)
+            print("Top 10 article recommendations")
+            print("----" * 8)
+            
+            for item in recommended_items[self.col_map['itemId']]:
+                print(item)
+        return recommended_items[self.col_map['itemId']].values.tolist()
+        
+
+    def recommend_(self, csv_path, model, encodings, user_id=None, verbose=True):
         """Recommends items to users
         :param csv_path: Path containing the raw data as reference
         :param model: Model
@@ -193,8 +256,10 @@ class NeuralCollabFiltering:
 
         if not user_id:
             user_id = df[df.duplicated(subset=[self.col_map['userId']])][self.col_map['userId']].sample(1).iloc[0]
-
+            
         items_watched_by_user = df[df[self.col_map['userId']] == user_id]
+        if items_watched_by_user.empty:
+            return []
         items_not_watched = df[~df[self.col_map['itemId']].isin(
             items_watched_by_user[self.col_map['itemId']].values)][self.col_map['itemId']]
         items_not_watched = list(

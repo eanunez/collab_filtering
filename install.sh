@@ -11,3 +11,11 @@ if [ -f $PWD/venv/bin/activate ]; then
     pip3 install -r requirements.txt
 fi
 exec "$@"
+### Check if a directory does not exist ###
+if [ ! -d "$PWD/dataset" ]; then
+    echo "Creating $PWD/dataset" 
+    mkdir $PWD/dataset
+fi
+if [ ! -d "$PWD/model" ]; then
+	echo "Creating $PWD/model"
+	mkdir $PWD/model
