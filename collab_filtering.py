@@ -109,10 +109,14 @@ class NeuralCollabFiltering:
         encodings = {'user_encodings': user_encodings, 'item_encodings': item_encodings}
         with open(encoding_path, 'w+', encoding='utf-8', newline='') as f:
             json.dump(encodings, f, indent=4, sort_keys=True)
-            print(f"New training data saved at {encoding_path}")
+            print(f"Encodings data saved at {encoding_path}")
             
         if not training_csv:
-            training_csv = os.path.join(self.base_dir, f"dataset/")
+            csv_file = f"{os.path.basename(csv_path).split('.csv')[0]}_reduced.csv"
+            training_csv = os.path.join(self.base_dir, f"dataset/{csv_file}")
+        with open(training_csv, 'w+', encoding='utf-8', newline='') as f:
+            df.to_csv(f, index=False)
+            print(f"New training data saved at: {training_csv}")
         print(f"Pre-processing time {time.time() - t0} secs")
 
         return df
@@ -303,7 +307,7 @@ class NeuralCollabFiltering:
 if __name__ == '__main__':
     base_dir = os.path.abspath(os.path.dirname(__file__))
     cols = ['summit_client_id', 'slug', 'time_on_page']
-    ncf = NeuralCollabFiltering()
+    ncf = NeuralCollabFiltering(cols)
     df = ncf.pre_processing(os.path.join(base_dir, 'training_data_202004-202006.csv'), cols=cols)
     n_users = df.summit_client_id.unique().shape[0]
     n_items = df.slug.unique().shape[0]
