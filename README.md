@@ -12,7 +12,4 @@ The methods are generic to accept users and items of different header columns.
 3. Activate virtual environment
 `$ source venv/bin/activate`
 
-## Training:
-`cols = [<client_id>, <article_id>, <time_on_page>]`
-`ncf = NeuralCollabFiltering(cols)'
-`ncf.pre_process(csv_path, 'dataset/encodings.json')`
+Check the [test](collab_filtering/test_collab_filtering.ipynb) as an example of running the algorithm.
