@@ -12,4 +12,4 @@ The methods are generic to accept users and items of different header columns.
 3. Activate virtual environment
 `$ source venv/bin/activate`
 
-Check the [test](collab_filtering/test_collab_filtering.ipynb) as an example of running the algorithm.
+Check the [test](test_collab_filtering.ipynb) as an example of running the algorithm.
