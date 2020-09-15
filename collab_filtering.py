@@ -194,9 +194,9 @@ class NeuralCollabFiltering:
         self.item_encoded2item = {v: k for k, v in self.item_encodings.items()}
         self.model = tf.keras.models.load_model(model_path, custom_objects=None, compile=True, options=None)
         
-    def recommend(self, user_id=None, verbose=True):
-        if not user_id:
-            user_id = self.df[self.df.duplicated(subset=[self.col_map['userId']])][self.col_map['userId']].sample(1).iloc[0]
+    def recommend(self, user_id, verbose=True):
+        # if not user_id:
+        #    user_id = self.df[self.df.duplicated(subset=[self.col_map['userId']])][self.col_map['userId']].sample(1).iloc[0]
             
         items_watched_by_user = self.df[self.df[self.col_map['userId']] == user_id]
         if items_watched_by_user.empty:
