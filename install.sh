@@ -19,3 +19,5 @@ fi
 if [ ! -d "$PWD/model" ]; then
 	echo "Creating $PWD/model"
 	mkdir $PWD/model
+# Initialize model config file
+printf "{}" > $PWD/config.json
