@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 import numpy as np
 import json
-# from zipfile import ZipFile
+import argparse
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -55,11 +55,18 @@ class NeuralCollabFiltering:
     x_train, y_train, x_val, y_val = [], [], [], []
     df, model, user_encodings, item_encodings, item_encoded2item = None, None, None, None, None
 
-    def __init__(self, cols=None):
+    def __init__(self, domain=None, cols=None):
         """
+        :param domain: Site domain to train
         :param cols: Columns to use for training. If None, defaults
         to ['userId', 'itemId', 'rating']"""
         
+        self.domain = domain
+        if self.domain:
+            self.site = domain.split('.')[1].lower()
+        else:
+            self.site = ''
+            
         def_cols = ['userId', 'itemId', 'rating']
         if not cols:
             self.col_map = dict(zip(def_cols, def_cols))
@@ -105,7 +112,7 @@ class NeuralCollabFiltering:
             f"Max {self.col_map['rating']}: {self.max_rating}"
             )
         if not encoding_path:
-            encoding_path = os.path.join(self.base_dir, f"model/encoders_{self.today.strftime('%Y%m%d')}.json")
+            encoding_path = os.path.join(self.base_dir, f"model/{self.site}_encoders_{self.today.strftime('%Y%m%d')}.json")
         encodings = {'user_encodings': user_encodings, 'item_encodings': item_encodings}
         with open(encoding_path, 'w+', encoding='utf-8', newline='') as f:
             json.dump(encodings, f, indent=4, sort_keys=True)
@@ -117,6 +124,21 @@ class NeuralCollabFiltering:
         with open(training_csv, 'w+', encoding='utf-8', newline='') as f:
             df.to_csv(f, index=False)
             print(f"New training data saved at: {training_csv}")
+            
+        # set config
+        json_path = 'config.json'
+        data = {}
+        with open(json_path, 'r') as jf:
+            data = json.load(jf)
+            if not data:
+                data[site] = {'encoding': encoding_path,
+                             'data': training_csv}
+            else:
+                data[site]['encoding'] = encoding_path
+                data[site]['data'] =  training_csv
+                
+        with open(json_path, 'w+') as jf:
+            json.dump(data, jf)
         print(f"Pre-processing time {time.time() - t0} secs")
 
         return df
@@ -173,8 +195,17 @@ class NeuralCollabFiltering:
             plt.legend(["train", "test"], loc="upper left")
             plt.show()
         if save_model:
-            model_path = os.path.join(self.base_dir, f"model/ncf_model_{self.today.strftime('%Y%m%d')}")
+            model_path = os.path.join(self.base_dir, f"model/{self.site}_ncf_model_{self.today.strftime('%Y%m%d')}")
             model.save(model_path, save_format='tf')
+            
+        # set config
+        json_path = 'config.json'
+        with open(json_path, 'r') as jf:
+            data = json.load(jf)
+            data[site]['model'] = model_path
+        with open(json_path, 'w+') as jf:
+            json.dump(data, jf)
+        
         print(f'Training time: {(time.time() - t0)/3600} hours.')
         
         return model
@@ -305,10 +336,14 @@ class NeuralCollabFiltering:
 
 
 if __name__ == '__main__':
-    base_dir = os.path.abspath(os.path.dirname(__file__))
+    # PARSING ARGUMENTS
+    parser = argparse.ArgumentParser(prog='python3 collab_filtering.py')
+    parser.add_argument("domain", type=str, help="Input the site domain to train.")
+    parser.add_argument("infile", type=str, help="Complete path to training file (.csv)")
+    
     cols = ['summit_client_id', 'slug', 'time_on_page']
-    ncf = NeuralCollabFiltering(cols)
-    df = ncf.pre_processing(os.path.join(base_dir, 'training_data_202004-202006.csv'), cols=cols)
+    ncf = NeuralCollabFiltering(args.domain, cols)
+    df = ncf.pre_processing(args.infile)
     n_users = df.summit_client_id.unique().shape[0]
     n_items = df.slug.unique().shape[0]
     ncf.train_test_split(df)
