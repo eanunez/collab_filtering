@@ -126,16 +126,16 @@ class NeuralCollabFiltering:
             print(f"New training data saved at: {training_csv}")
             
         # set config
-        json_path = 'config.json'
+        json_path = os.path.join(self.base_dir, 'config.json')
         data = {}
         with open(json_path, 'r') as jf:
             data = json.load(jf)
             if not data:
-                data[site] = {'encoding': encoding_path,
-                             'data': training_csv}
+                data[self.site] = {'encoding': encoding_path,
+                                   'data': training_csv}
             else:
-                data[site]['encoding'] = encoding_path
-                data[site]['data'] =  training_csv
+                data[self.site]['encoding'] = encoding_path
+                data[self.site]['data'] =  training_csv
                 
         with open(json_path, 'w+') as jf:
             json.dump(data, jf)
@@ -199,10 +199,10 @@ class NeuralCollabFiltering:
             model.save(model_path, save_format='tf')
             
         # set config
-        json_path = 'config.json'
+        json_path = os.path.join(self.base_dir, 'config.json')
         with open(json_path, 'r') as jf:
             data = json.load(jf)
-            data[site]['model'] = model_path
+            data[self.site]['model'] = model_path
         with open(json_path, 'w+') as jf:
             json.dump(data, jf)
         
